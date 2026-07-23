@@ -95,9 +95,26 @@ class Maze:
             return self.grid[iy, ix] == self.FREE
         return False
 
-    def get_random_free_cells(self, n: int) -> list:
-        """Return *n* random free-cell centres as (x, y) float tuples."""
+    def get_random_free_cells(self, n: int, min_border_dist: int = 3) -> list:
+        """Return *n* random free-cell centres as (x, y) float tuples.
+
+        Cells within *min_border_dist* of the grid edge are excluded so
+        agents don't start trapped against the outer wall.
+        """
         free_ys, free_xs = np.where(self.grid == self.FREE)
+        # Filter out cells too close to the border
+        mask = (
+            (free_xs >= min_border_dist)
+            & (free_xs < self.size - min_border_dist)
+            & (free_ys >= min_border_dist)
+            & (free_ys < self.size - min_border_dist)
+        )
+        free_ys = free_ys[mask]
+        free_xs = free_xs[mask]
+        if len(free_ys) < n:
+            raise RuntimeError(
+                f"Only {len(free_ys)} free cells away from border, need {n}"
+            )
         indices = self._rng.choice(len(free_ys), size=n, replace=False)
         return [
             (float(free_xs[i]) + 0.5, float(free_ys[i]) + 0.5)

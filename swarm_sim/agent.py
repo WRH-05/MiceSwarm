@@ -135,7 +135,11 @@ class Agent:
     # ------------------------------------------------------------------
 
     def _move_toward_target(self, dt: float) -> None:
-        """Direct movement toward the current frontier target."""
+        """Direct movement toward the current frontier target.
+
+        If blocked, falls through to wall-following exploration rather
+        than wasting the tick.
+        """
         tx, ty = self.target_frontier
         dx = tx - self.x
         dy = ty - self.y
@@ -143,6 +147,7 @@ class Agent:
 
         if dist < 0.5:  # arrived — clear target so planner picks a new one
             self.target_frontier = None
+            self._move_explore(dt)  # don't waste the tick
             return
 
         # Normalise direction
@@ -169,9 +174,9 @@ class Agent:
             if slid:
                 self.theta = math.atan2(udy, udx)
             else:
-                # Blocked — try turning toward a free direction
-                self.target_frontier = None  # give up on this target
-                self._turn_to_free()
+                # Blocked — give up and explore
+                self.target_frontier = None
+                self._move_explore(dt)
 
     def _move_explore(self, dt: float) -> None:
         """Wall-following exploration when no target is assigned.

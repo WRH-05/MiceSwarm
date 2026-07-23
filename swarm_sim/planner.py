@@ -216,7 +216,7 @@ class FrontierPlanner:
     def _is_recently_visited(self, agent_id: int, cx: float, cy: float) -> bool:
         """Return True if (cx, cy) was recently visited by *agent_id*."""
         for vx, vy, _ in self._visited.get(agent_id, []):
-            if math.sqrt((cx - vx) ** 2 + (cy - vy) ** 2) < 3.0:
+            if math.sqrt((cx - vx) ** 2 + (cy - vy) ** 2) < 1.0:
                 return True
         return False
 

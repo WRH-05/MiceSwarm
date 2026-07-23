@@ -203,7 +203,7 @@ async def run_simulation(args: argparse.Namespace) -> None:
                 known_fracs = [a.local_map.known_fraction for a in agents]
                 avg_known = sum(known_fracs) / len(known_fracs) * 100
                 logger.info(
-                    "Tick %5d | map %.1f%% known | %d links | %d syncs (%d chunks)",
+                    "Tick %5d | map %.2f%% known | %d links | %d syncs (%d chunks)",
                     tick, avg_known, len(links),
                     comms.total_syncs, comms.total_chunks_exchanged,
                 )
@@ -254,6 +254,9 @@ def main(argv: list | None = None) -> None:
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+    # Suppress DEBUG noise from FoxgloveServer internals
+    logging.getLogger("FoxgloveServer").setLevel(logging.WARNING)
+    logging.getLogger("websockets").setLevel(logging.WARNING)
 
     # Windows: use SelectorEventLoop for compatibility
     if sys.platform == "win32":

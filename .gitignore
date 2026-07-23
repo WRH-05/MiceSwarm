@@ -1,0 +1,3 @@
+.claudeignore
+PROMPT.md
+*/__pycache__/

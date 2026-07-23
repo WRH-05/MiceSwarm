@@ -130,6 +130,7 @@ class FrontierPlanner:
 
     def select_target(
         self,
+        agent_id: int,
         agent_x: float,
         agent_y: float,
         frontiers: list,
@@ -142,36 +143,91 @@ class FrontierPlanner:
         *peers* is a list of ``(px, py, target)`` tuples for all other
         agents (target is ``(tx, ty)`` or ``None``).
 
-        Target persistence: if *current_target* is still a valid frontier
-        centroid within 5 cells, it gets a bonus to prevent oscillation.
+        Tracks recently visited centroids to avoid re-selecting
+        unreachable targets, and assigns one agent per frontier.
         """
         if not frontiers:
             return None
+
+        # Age-out visited entries
+        self._tick_visited()
 
         best_utility = -float("inf")
         best_target = None
 
         for f in frontiers:
+            cx, cy = f.center
+
+            # Skip if this agent recently visited this centroid
+            if self._is_recently_visited(agent_id, cx, cy):
+                continue
+
+            # Skip if another agent is already assigned to this frontier
+            if self._is_assigned_to_other(agent_id, cx, cy):
+                continue
+
             u = self.compute_utility(agent_x, agent_y, f, peers, comm_range)
             # Bonus for sticking with current target (avoids oscillation)
-            if (
-                current_target is not None
-                and math.sqrt(
-                    (f.center[0] - current_target[0]) ** 2
-                    + (f.center[1] - current_target[1]) ** 2
+            if current_target is not None:
+                d = math.sqrt(
+                    (cx - current_target[0]) ** 2 + (cy - current_target[1]) ** 2
                 )
-                < 5.0
-            ):
-                u += 2.0
+                if d < 3.0:
+                    u += 2.0
             if u > best_utility:
                 best_utility = u
-                best_target = f.center
+                best_target = (cx, cy)
 
-        # If all utilities are deeply negative, don't bother
-        if best_utility <= -self.PENALTY:
+        # If all utilities are deeply negative or no valid target
+        if best_target is None or best_utility <= -self.PENALTY:
             return None
 
+        # If the agent already has a target and it's different from the new
+        # best, mark the old one as visited
+        if current_target is not None and current_target != best_target:
+            self._mark_visited(agent_id, current_target[0], current_target[1])
+
+        # Record assignment
+        self._assignments[agent_id] = best_target
+
         return best_target
+
+    # ------------------------------------------------------------------
+    # Visited-tracking helpers
+    # ------------------------------------------------------------------
+
+    def _tick_visited(self) -> None:
+        """Decrement TTL on all visited entries."""
+        for agent_id in list(self._visited.keys()):
+            self._visited[agent_id] = [
+                (cx, cy, ttl - 1)
+                for cx, cy, ttl in self._visited[agent_id]
+                if ttl > 1
+            ]
+            if not self._visited[agent_id]:
+                del self._visited[agent_id]
+
+    def _mark_visited(self, agent_id: int, cx: float, cy: float) -> None:
+        """Record that *agent_id* has attempted to reach (cx, cy)."""
+        if agent_id not in self._visited:
+            self._visited[agent_id] = []
+        self._visited[agent_id].append((cx, cy, self.VISIT_MEMORY))
+
+    def _is_recently_visited(self, agent_id: int, cx: float, cy: float) -> bool:
+        """Return True if (cx, cy) was recently visited by *agent_id*."""
+        for vx, vy, _ in self._visited.get(agent_id, []):
+            if math.sqrt((cx - vx) ** 2 + (cy - vy) ** 2) < 3.0:
+                return True
+        return False
+
+    def _is_assigned_to_other(self, agent_id: int, cx: float, cy: float) -> bool:
+        """Return True if another agent is already targeting this frontier."""
+        for aid, (ax, ay) in self._assignments.items():
+            if aid == agent_id:
+                continue
+            if math.sqrt((cx - ax) ** 2 + (cy - ay) ** 2) < 3.0:
+                return True
+        return False
 
 
 # ------------------------------------------------------------------
@@ -210,7 +266,7 @@ if __name__ == "__main__":
     print("Utility discounting: OK")
 
     # Test selection
-    target = planner.select_target(agent_x, agent_y, frontiers, peers, comm_range=5.0)
+    target = planner.select_target(0, agent_x, agent_y, frontiers, peers, comm_range=5.0)
     assert target is not None
     print(f"Selected target: ({target[0]:.1f}, {target[1]:.1f})")
     print("Target selection: OK")

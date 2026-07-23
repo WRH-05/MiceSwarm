@@ -117,7 +117,7 @@ class Agent:
                 (current[0] - self._prev_position[0]) ** 2
                 + (current[1] - self._prev_position[1]) ** 2
             )
-            if d < 0.005:
+            if d < 0.02:  # 10% of expected movement per tick
                 self._stuck_ticks += 1
             else:
                 self._stuck_ticks = max(0, self._stuck_ticks - 1)

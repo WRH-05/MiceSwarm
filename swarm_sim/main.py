@@ -167,7 +167,7 @@ async def run_simulation(args: argparse.Namespace) -> None:
                 # Exclude self from peers list
                 peers = peer_info[:i] + peer_info[i + 1:]
                 target = planner.select_target(
-                    a.x, a.y, frontiers, peers, args.comm_range,
+                    a.agent_id, a.x, a.y, frontiers, peers, args.comm_range,
                     current_target=a.target_frontier,
                 )
                 a.set_target(target)
